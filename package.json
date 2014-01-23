@@ -1,6 +1,6 @@
 {
   "name": "hubot-prmanager",
-  "version": "0.0.4",
+  "version": "0.0.6",
   "description": "PR Manager Script for Hubot",
   "main": "index.coffee",
   "repository": {

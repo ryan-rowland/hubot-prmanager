@@ -55,23 +55,23 @@ module.exports = function(robot) {
     opened: function (user, origRequest) {
       var req = prManager.open(origRequest);
 
-      robot.send(user, '\
-        New PR: '       + req.url       + ' | \
-        From branch: '  + req.branch    + ' | \
-        Description: '  + req.title     + ' | \
-        Opened by: '    + req.initiator + ' | \
-        Assigned to: '  + req.assignee || 'Nobody'
+      robot.send(user, '' +
+        'New PR: '       + req.url       + ' | ' +
+        'From branch: '  + req.branch    + ' | ' +
+        'Description: '  + req.title     + ' | ' +
+        'Opened by: '    + req.initiator + ' | ' +
+        'Assigned to: '  + req.assignee || 'Nobody'
       );
     },
 
     reopened: function (user, origRequest) {
       var req = prManager.reopen(origRequest);
 
-      robot.send(user, '\
-        Re-opened PR: ' + req.url           + ' | \
-        From branch: '  + req.branch        + ' | \
-        Re-opened by: ' + data.sender.login + ' | \
-        Assigned to: '  + req.assignee || 'Nobody'
+      robot.send(user, '' +
+        'Re-opened PR: ' + req.url    + ' | ' +
+        'From branch: '  + req.branch + ' | ' +
+        'Re-opened by: ' + req.sender + ' | ' +
+        'Assigned to: '  + req.assignee || 'Nobody'
       );
     },
 
@@ -82,20 +82,20 @@ module.exports = function(robot) {
     merged: function(user, origRequest) {
       var req = prManager.close(origRequest);
 
-      robot.send(user, '\
-        Merged PR: '  + req.url   + ' | \
-        Merged by: '  + data.sender.login
+      robot.send(user, '' +
+        'Merged PR: '  + req.url   + ' | ' +
+        'Merged by: '  + req.sender
       );
     },
 
     closed: function(user, origRequest) {
       var req = prManager.close(origRequest);
 
-      prManager.getIssueComment(repo, req.number, function(comment) {
-        robot.send(user, '\
-          Rejected PR: '  + req.url           + ' | \
-          Closed by: '    + data.sender.login + ' | \
-          Reason: '       + comment
+      prManager.getIssueComment(req.repo, req.number, function(comment) {
+        robot.send(user, '' +
+          'Rejected PR: '  + req.url    + ' | ' +
+          'Closed by: '    + req.sender + ' | ' +
+          'Reason: '       + comment
         );
       });
     }
@@ -121,6 +121,7 @@ module.exports = function(robot) {
       branch : data.pull_request.head.ref,
       merged : data.pull_request.merged,
       number : data.number,
+      sender : data.sender.login,
       assignee : data.pull_request.assignee,
       initiator : data.pull_request.user.login
     };
