@@ -1,0 +1,27 @@
+{
+  "name": "hubot-prmanager",
+  "version": "0.0.1",
+  "description": "PR Manager Script for Hubot",
+  "main": "index.coffee",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ryan-rowland/hubot-prmanager"
+  },
+  "keywords": [
+    "hubot",
+    "pull",
+    "request",
+    "campfire",
+    "irc"
+  ],
+  "author": "Ryan Rowland",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ryan-rowland/hubot-prmanager/issues"
+  },
+  "homepage": "https://github.com/ryan-rowland/hubot-prmanager",
+  "readmeFilename": "README.md",
+  "dependencies": {
+    "hubot": " >= 2.4.0"
+  }
+}
