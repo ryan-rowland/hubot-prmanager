@@ -36,16 +36,68 @@ module.exports = function(robot) {
 
   // Define `pr list`
   robot.respond(/pr list/i, function(msg) {
-    var prList = prManager.list();
+    var prList = prManager.getOpenRequests();
 
     var response = 'Open Pull Requests:\n';
     for(reqName in prList) {
       var request = prList[reqName];
-      response += request.url + ' | Assigned to: ' + request.assignee + '\n';
+      response += request.url + '\n';
     }
 
     msg.send(prList.length ? response : 'There are no open pull requests!')
   });
+
+  // Define Pull Request Hook handlers
+  var _actionHandlers = {
+
+    opened: function (origRequest) {
+      var req = prManager.open(origRequest);
+
+      robot.send(user, '\
+        New PR: '       + req.url       + ' | \
+        From branch: '  + req.branch    + ' | \
+        Description: '  + req.title     + ' | \
+        Opened by: '    + req.initiator + ' | \
+        Assigned to: '  + req.assignee
+      );
+    },
+
+    reopened: function (origRequest) {
+      var req = prManager.reopen(origRequest);
+
+      robot.send(user, '\
+        Re-opened PR: ' + req.url           + ' | \
+        From branch: '  + req.branch        + ' | \
+        Re-opened by: ' + data.sender.login + ' | \
+        Assigned to: '  + req.assignee
+      );
+    },
+
+    synchronize: function(origRequest) {
+      robot.send(user, 'Updated PR: ' + req.url);
+    },
+
+    merged: function(origRequest) {
+      var req = prManager.close(origRequest);
+
+      robot.send(user, '\
+        Merged PR: '  + req.url   + ' | \
+        Merged by: '  + data.sender.login
+      );
+    },
+
+    closed: function(origRequest) {
+      var req = prManager.close(origRequest);
+
+      prManager.getIssueComment(repo, req.number, function(comment) {
+        robot.send(user, '\
+          Rejected PR: '  + req.url           + ' | \
+          Closed by: '    + data.sender.login + ' | \
+          Reason: '       + comment
+        );
+      });
+    }
+  };
 
   // Listen for the pull request hook
   robot.router.post('/hubot/gh-pull-requests', function(req, res) {
@@ -73,29 +125,13 @@ module.exports = function(robot) {
 
     res.end();
 
-    // Handle the hook depending on whether it was opened, closed, etc...
-    switch(data.action) {
-      case 'opened':
-          request = prManager.open(request);
-          robot.send(user, 'New PR: ' + request.url + ' | From branch \'' + request.branch + '\' | Description: \'' + request.title + '\' | Opened by ' + request.initiator + ' | Assigned to ' + request.assignee);
-        break;
-      case 'reopened':
-          request = prManager.reopen(request);
-          robot.send(user, 'Re-opened PR: ' + request.url + ' | From branch \'' + request.branch + '\' | Re-opened by ' + data.sender.login + ' | Assigned to ' + request.assignee);
-        break;
-      case 'synchronize':
-          robot.send(user, 'Updated PR: ' + request.url);
-        break;
-      case 'closed':
-        request = prManager.close(request);
-        if(request.merged) {
-          robot.send(user, 'Merged PR: ' + request.url + ' | Merged by ' + data.sender.login);
-        } else {
-          prManager.getIssueComment(repo, request.number, function(comment) {
-            robot.send(user, 'Rejected PR: ' + request.url + ' | Closed by ' + data.sender.login + ' | Reason: ' + comment);
-          });
-        }
-        break;
+    // Determine which action we need to take
+    var action = data.action;
+    if(action == 'closed' && request.merged) {
+      action = 'merged';
     }
+
+    // Run the appropriate handler
+    _actionHandlers[action](request);
   });
 }

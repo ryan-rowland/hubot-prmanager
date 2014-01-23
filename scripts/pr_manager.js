@@ -1,6 +1,11 @@
 module.exports = function PR_Manager(robot) {
-  var _baseUrl = process.env.HUBOT_GITHUB_API || 'https://api.github.com';
-  var _org = process.env.HUBOT_GITHUB_ORG || 'sony-magic';
+  // Config Constants
+  var BASE_URL = process.env.HUBOT_GITHUB_API || 'https://api.github.com';
+  var ROOMS = process.env.HUBOT_PR_ROOMS;
+  var ORG = process.env.HUBOT_GITHUB_ORG;
+  var HOST = process.env.HUBOT_HOST;
+
+  // Private Variables
   var _github = require('githubot')(robot);
   var _prs = {};
 
@@ -9,6 +14,7 @@ module.exports = function PR_Manager(robot) {
     _prs = robot.brain.data.prs || _prs;
   });
 
+  // Update robot brain with new request
   this.open = function(request) {
     request.open = true;
 
@@ -18,64 +24,98 @@ module.exports = function PR_Manager(robot) {
     return request
   };
 
+  // Update robot brain with re-opened request
   this.reopen = function(request) {
+    var output = request;
+
     if(_prs[request.id]) {
       _prs[request.id].open = true;
       robot.brain.data.prs = _prs;
-      return request;
     } else {
-      return this.open(request);
+      output = this.open(request);
     }
+
+    return output;
   };
 
+  // Update robot brain with closed request
   this.close = function(request) {
     if(_prs[request.id]) {
       _prs[request.id].open = false;
       robot.brain.data.prs = _prs;
     }
+
     return request;
   };
 
+  // Set the value of a PR's key in robot brain
   this.setParam = function(id, key, value) {
-    if(_prs[id]) {
-      _prs[id][key] = value;
+    var output = 'Could not find ' + id;
+    var pr = _prs[id];
+
+    if(pr) {
+      pr[key] = value;
       robot.brain.data.prs = _prs;
-      return 'Set ' + key + ' of ' + id + ' to ' + value;
-    } else {
-      return 'Couldn\'t find' + id;
+      output = 'Set ' + key + ' of ' + id + ' to ' + value;
     }
+
+    return output;
   };
 
+  // Get the value of a PR's key in robot brain
   this.getParam = function(id, key) {
-    if(_prs[id]) {
-      return _prs[id][key];
-    } else {
-      return 'Couldn\'t find' + id;
-    }
+    var pr = _prs[id];
+    return pr[key] || 'Could not find ' + id;
   }
 
+  // Completely delete a PR record from robot brain
   this.deleteRequest = function(id) {
-    if(_prs[id]) {
-      delete _prs[id];
+    var pr = _prs[id];
+
+    if(pr) {
+      delete pr;
       robot.brain.data.prs = _prs;
     }
   };
 
-  this.getRequest = function(id) {
-    if(_prs[id]) {
-      var output = [];
-      for(key in _prs[id]) {
-        output.push(key + '=' + _prs[id][key]);
-      }
-
-      return output;
-    } else {
-      return 'Couldn\'t find' + id;
+  // Get all open PRs
+  this.getOpenRequests = function() {
+    var openRequests = [];
+    for (req in _prs) {
+      _prs[req].open == true && openRequests.push(_prs[req]);
     }
+
+    return openRequests;
+  };
+
+  // Get a PR's entire record from robot brain
+  this.getRequest = function(id) {
+    var output = 'Could not find ' + id;
+    var pr = _prs[id];
+
+    if(pr) {
+      output = [];
+
+      for(key in pr) {
+        output.push(key + '=' + pr[key]);
+      }
+    }
+
+    return output;
+  };
+
+  // Get the most recent comment on a repo
+  this.getIssueComment = function(repo, issueID, cb) {
+    var commentUrl = BASE_URL + '/repos/' + ORG + '/' + repo + '/issues/' + issueID + '/comments?sort=created&direction=desc';
+
+    _github.get(commentUrl, function(comments) {
+      var reason = (comments && comments[0]) ? comments[0].body : 'Unspecified';
+      cb && cb(reason);
+    });
   };
 
   function _getRepos(cb) {
-    var reposUrl = _baseUrl + '/orgs/' + _org + '/repos?type=private';
+    var reposUrl = BASE_URL + '/orgs/' + ORG + '/repos?type=private';
 
     _github.get(reposUrl, function(repos) {
       cb && cb(repos);
@@ -83,7 +123,7 @@ module.exports = function PR_Manager(robot) {
   };
 
   function _getHooks(repoName, cb) {
-    var hookUrl = _baseUrl + '/repos/' + _org + '/' + repoName + '/hooks';
+    var hookUrl = BASE_URL + '/repos/' + ORG + '/' + repoName + '/hooks';
 
     _github.get(hookUrl, function(hooks) {
       cb && cb(hooks, repoName);
@@ -91,15 +131,15 @@ module.exports = function PR_Manager(robot) {
   };
 
   function _setHook(repoName, cb) {
-    var hookUrl = _baseUrl + '/repos/' + _org + '/' + repoName + '/hooks';
+    var hookUrl = BASE_URL + '/repos/' + ORG + '/' + repoName + '/hooks';
 
     var hookData = {
-      "name" : "web",
-      "active" : true,
-      "events" : [ "pull_request" ],
-      "config" : {
-        "url" : "http://184.169.138.183:8081/hubot/gh-pull-requests?room=%23pullrequests",
-        "content_type" : "json"
+      'name' : 'web',
+      'active' : true,
+      'events' : [ 'pull_request' ],
+      'config' : {
+        'url' : HOST + ':' + PORT + '/hubot/gh-pull-requests?room=' + ROOMS,
+        'content_type' : 'json'
       }
     };
 
@@ -122,30 +162,14 @@ module.exports = function PR_Manager(robot) {
           }
 
           !isHooked && _setHook(repoName, function(response) {
-            robot.send( { 'room' : '#pullrequests' }, 'Set hook on ' + repoName );
-            robot.send( { 'room' : '#chat' }, 'Set hook on ' + repoName );
             console.log('Set hook on ' + repoName);
+            
+            for(roomName in ROOMS.split(',')) {
+              robot.send( { 'room' : roomName }, 'Set hook on ' + repoName );
+            }
           });
         });
       }
-    });
-  };
-    
-  this.list = function() {
-    var openRequests = [];
-    for (req in _prs) {
-      _prs[req].open == true && openRequests.push(_prs[req]);
-    }
-
-    return openRequests;
-  };
-
-  this.getIssueComment = function(repo, issueID, cb) {
-    var commentUrl = _baseUrl + '/repos/' + _org + '/' + repo + '/issues/' + issueID + '/comments?sort=created&direction=desc';
-
-    _github.get(commentUrl, function(comments) {
-      var reason = (comments && comments[0]) ? comments[0].body : 'Unspecified';
-      cb && cb(reason);
     });
   };
 }
