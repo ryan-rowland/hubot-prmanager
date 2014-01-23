@@ -64,7 +64,6 @@ module.exports = function(robot) {
       );
     },
 
-    n
     reopened: function (user, origRequest) {
       var req = prManager.reopen(origRequest);
 
