@@ -41,7 +41,9 @@ module.exports = function(robot) {
     var response = 'Open Pull Requests:\n';
     for(reqName in prList) {
       var request = prList[reqName];
-      response += request.url + '\n';
+      var assignee = request.assignee | 'Nobody';
+
+      response += request.url + ' | Assigned to: ' + assignee + '\n';
     }
 
     msg.send(prList.length ? response : 'There are no open pull requests!')
@@ -50,7 +52,7 @@ module.exports = function(robot) {
   // Define Pull Request Hook handlers
   var _actionHandlers = {
 
-    opened: function (origRequest) {
+    opened: function (user, origRequest) {
       var req = prManager.open(origRequest);
 
       robot.send(user, '\
@@ -58,26 +60,27 @@ module.exports = function(robot) {
         From branch: '  + req.branch    + ' | \
         Description: '  + req.title     + ' | \
         Opened by: '    + req.initiator + ' | \
-        Assigned to: '  + req.assignee
+        Assigned to: '  + req.assignee || 'Nobody'
       );
     },
 
-    reopened: function (origRequest) {
+    n
+    reopened: function (user, origRequest) {
       var req = prManager.reopen(origRequest);
 
       robot.send(user, '\
         Re-opened PR: ' + req.url           + ' | \
         From branch: '  + req.branch        + ' | \
         Re-opened by: ' + data.sender.login + ' | \
-        Assigned to: '  + req.assignee
+        Assigned to: '  + req.assignee || 'Nobody'
       );
     },
 
-    synchronize: function(origRequest) {
+    synchronize: function(user, origRequest) {
       robot.send(user, 'Updated PR: ' + req.url);
     },
 
-    merged: function(origRequest) {
+    merged: function(user, origRequest) {
       var req = prManager.close(origRequest);
 
       robot.send(user, '\
@@ -86,7 +89,7 @@ module.exports = function(robot) {
       );
     },
 
-    closed: function(origRequest) {
+    closed: function(user, origRequest) {
       var req = prManager.close(origRequest);
 
       prManager.getIssueComment(repo, req.number, function(comment) {
@@ -132,6 +135,6 @@ module.exports = function(robot) {
     }
 
     // Run the appropriate handler
-    _actionHandlers[action](request);
+    _actionHandlers[action](user, request);
   });
 }
